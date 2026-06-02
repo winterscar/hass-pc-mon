@@ -1,0 +1,32 @@
+[package]
+name = "hass-pc-mon"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+
+[dependencies]
+anyhow = "1"
+thiserror = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+shellexpand = "3"
+hostname = "0.4"
+display-info = "0.5"
+rumqttc = "0.24"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "signal"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.23"
+core-foundation = "0.9"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11 = { version = "2", features = ["xlib", "xss"] }
+zbus = { version = "4", default-features = false, features = ["tokio"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.56", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_System_SystemInformation"] }
