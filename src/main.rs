@@ -14,7 +14,7 @@ use cli::{Cli, Command};
 use config::Config;
 use rumqttc::{Event, Packet};
 use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 fn main() -> Result<()> {
     let _log_guards = logging::init()?;
