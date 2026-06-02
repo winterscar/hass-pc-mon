@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod discovery;
 mod host;
+mod install;
 mod logging;
 mod mqtt;
 mod platform;
@@ -34,13 +35,8 @@ fn main() -> Result<()> {
                 .context("building tokio runtime")?;
             runtime.block_on(run(config))
         }
-        Command::Install => {
-            // Filled in by Task 11.
-            anyhow::bail!("install not yet implemented")
-        }
-        Command::Uninstall => {
-            anyhow::bail!("uninstall not yet implemented")
-        }
+        Command::Install => install::install(),
+        Command::Uninstall => install::uninstall(),
     }
 }
 
