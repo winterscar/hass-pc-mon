@@ -28,10 +28,13 @@ pub fn idle_seconds() -> Result<u64> {
 }
 
 pub fn current_ssid() -> Result<Option<String>> {
+    let Some(iface) = wifi_interface()? else {
+        return Ok(None);
+    };
     let out = Command::new("/usr/sbin/networksetup")
-        .args(["-getairportnetwork", "en0"])
+        .args(["-getairportnetwork", &iface])
         .output()
-        .context("running networksetup")?;
+        .context("running networksetup -getairportnetwork")?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     // Expected format: "Current Wi-Fi Network: HomeNet"
     if let Some(rest) = stdout.split_once("Current Wi-Fi Network:") {
@@ -42,6 +45,35 @@ pub fn current_ssid() -> Result<Option<String>> {
         return Ok(Some(ssid.to_string()));
     }
     // "You are not associated with an AirPort network." style output.
+    Ok(None)
+}
+
+/// Find the Wi-Fi device's BSD name (e.g. `en0`, `en1`) by asking
+/// `networksetup -listallhardwareports`. Returns `Ok(None)` when no Wi-Fi
+/// hardware port is present on this Mac.
+fn wifi_interface() -> Result<Option<String>> {
+    let out = Command::new("/usr/sbin/networksetup")
+        .arg("-listallhardwareports")
+        .output()
+        .context("running networksetup -listallhardwareports")?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    // The output is paragraphs of:
+    //   Hardware Port: Wi-Fi
+    //   Device: en0
+    //   Ethernet Address: ...
+    let mut lines = stdout.lines();
+    while let Some(line) = lines.next() {
+        if line.trim() == "Hardware Port: Wi-Fi" {
+            if let Some(dev_line) = lines.next() {
+                if let Some(dev) = dev_line.trim().strip_prefix("Device:") {
+                    let dev = dev.trim();
+                    if !dev.is_empty() {
+                        return Ok(Some(dev.to_string()));
+                    }
+                }
+            }
+        }
+    }
     Ok(None)
 }
 

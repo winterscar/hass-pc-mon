@@ -77,7 +77,8 @@ impl Mqtt {
         self.client.publish(&self.topics.monitor_count, QoS::AtLeastOnce, true, count_bytes).await
             .context("publishing monitors/count")?;
 
-        let names_json = serde_json::to_vec(&sample.monitor_names).context("serializing monitor names")?;
+        let names_payload = serde_json::json!({ "names": &sample.monitor_names });
+        let names_json = serde_json::to_vec(&names_payload).context("serializing monitor names")?;
         self.client.publish(&self.topics.monitor_names, QoS::AtLeastOnce, true, names_json).await
             .context("publishing monitors/names")?;
 

@@ -43,12 +43,16 @@ fn wayland_idle_seconds() -> Result<u64> {
     Ok(0)
 }
 
+static IWGETID_WARN: OnceLock<()> = OnceLock::new();
+
 pub fn current_ssid() -> Result<Option<String>> {
     use std::process::Command;
     let out = match Command::new("iwgetid").arg("-r").output() {
         Ok(o) => o,
         Err(e) => {
-            warn!(error = %e, "iwgetid not available; treating as no SSID");
+            IWGETID_WARN.get_or_init(|| {
+                warn!(error = %e, "iwgetid not available; treating as no SSID for the rest of this run");
+            });
             return Ok(None);
         }
     };
