@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod discovery;
+mod host;
 mod logging;
 mod mqtt;
 mod platform;
