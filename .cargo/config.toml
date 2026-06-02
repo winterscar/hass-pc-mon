@@ -1,4 +1,5 @@
-# On macOS 26 (Tahoe), libiconv is not found by the linker without help.
-# The homebrew-installed libiconv provides the needed dylib.
+# On macOS 26 (Tahoe), the system linker can't find libiconv on its own.
+# Point at Homebrew's libiconv via its unversioned symlink so this survives
+# brew upgrades.
 [target.aarch64-apple-darwin]
-rustflags = ["-L", "/opt/homebrew/Cellar/libiconv/1.19/lib"]
+rustflags = ["-L", "/opt/homebrew/opt/libiconv/lib"]
