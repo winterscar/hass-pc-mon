@@ -1,4 +1,5 @@
 mod config;
+mod discovery;
 mod platform;
 mod sample;
 
