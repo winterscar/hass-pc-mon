@@ -1,5 +1,6 @@
 mod config;
 mod discovery;
+mod mqtt;
 mod platform;
 mod sample;
 
