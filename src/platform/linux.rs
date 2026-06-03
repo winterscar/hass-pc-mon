@@ -33,6 +33,13 @@ fn x11_idle_seconds() -> Result<u64> {
 
 static WAYLAND_WARN: OnceLock<()> = OnceLock::new();
 
+pub fn media_active() -> Result<bool> {
+    // No portable Linux equivalent of IOKit power assertions. systemd-inhibit
+    // covers some cases but isn't taken by browsers playing video. Always
+    // return false until we wire up something better.
+    Ok(false)
+}
+
 fn wayland_idle_seconds() -> Result<u64> {
     // No portable Wayland idle API. We log once and assume "active" (0 seconds idle)
     // so that activity reports remain conservative — i.e. we'll over-report activity
@@ -41,27 +48,6 @@ fn wayland_idle_seconds() -> Result<u64> {
         warn!("Wayland session detected; portable idle detection is not available — reporting 0 seconds idle");
     });
     Ok(0)
-}
-
-static IWGETID_WARN: OnceLock<()> = OnceLock::new();
-
-pub fn current_ssid() -> Result<Option<String>> {
-    use std::process::Command;
-    let out = match Command::new("iwgetid").arg("-r").output() {
-        Ok(o) => o,
-        Err(e) => {
-            IWGETID_WARN.get_or_init(|| {
-                warn!(error = %e, "iwgetid not available; treating as no SSID for the rest of this run");
-            });
-            return Ok(None);
-        }
-    };
-    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-    if s.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(s))
-    }
 }
 
 #[cfg(test)]
@@ -74,12 +60,6 @@ mod tests {
         // either a successful Wayland fallback OR an X11 error. Either is acceptable
         // — this test exists to ensure the function exits cleanly and doesn't panic.
         let _ = idle_seconds();
-        Ok(())
-    }
-
-    #[test]
-    fn ssid_does_not_error() -> Result<()> {
-        let _ = current_ssid()?;
         Ok(())
     }
 }

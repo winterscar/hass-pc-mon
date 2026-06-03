@@ -70,23 +70,12 @@ async fn run(config: Config) -> Result<()> {
                     }
                     Ok(other) => debug!(?other, "mqtt event"),
                     Err(e) => {
-                        warn!(error = %e, "mqtt event loop error — rumqttc will reconnect");
-                        tokio::time::sleep(Duration::from_secs(2)).await;
+                        warn!(error = %e, "mqtt connection error — retrying in 60s");
+                        tokio::time::sleep(Duration::from_secs(60)).await;
                     }
                 }
             }
             _ = ticker.tick() => {
-                let allowed = match sample::current_ssid() {
-                    Ok(s) => sample::ssid_allowed(&s, &config.wifi_ssids),
-                    Err(e) => {
-                        warn!(error = ?e, "ssid lookup failed; skipping publish this tick");
-                        continue;
-                    }
-                };
-                if !allowed {
-                    debug!("ssid not in allowed list; skipping publish");
-                    continue;
-                }
                 match sample::take(config.idle_threshold_secs) {
                     Ok(s) => {
                         if let Err(e) = mqtt.publish_sample(&s).await {

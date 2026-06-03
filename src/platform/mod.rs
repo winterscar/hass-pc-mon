@@ -19,6 +19,9 @@ pub fn idle_seconds() -> Result<u64> {
     imp::idle_seconds()
 }
 
-pub fn current_ssid() -> Result<Option<String>> {
-    imp::current_ssid()
+/// True if any process is holding an "inhibit idle" power assertion — set by
+/// video and audio playback. Used to treat a user watching a movie as active
+/// even though they're not generating HID events.
+pub fn media_active() -> Result<bool> {
+    imp::media_active()
 }

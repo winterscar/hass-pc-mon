@@ -1,80 +1,44 @@
-use anyhow::{anyhow, Context, Result};
-use core_graphics::event::CGEventType;
-use core_graphics::event_source::CGEventSourceStateID;
-use std::process::Command;
-
-// `CGEventSource::seconds_since_last_event_type` is NOT provided by the
-// core-graphics 0.23 crate, so we bind the underlying C function directly.
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGEventSourceSecondsSinceLastEventType(
-        stateID: CGEventSourceStateID,
-        eventType: CGEventType,
-    ) -> f64;
-}
+use anyhow::{anyhow, Result};
+use core_foundation::base::TCFType;
+use core_foundation::dictionary::{CFDictionary, CFDictionaryRef};
+use core_foundation::number::CFNumber;
+use core_foundation::string::CFString;
+use user_idle::UserIdle;
 
 pub fn idle_seconds() -> Result<u64> {
-    // CGEventType::Null (== 0 == kCGAnyInputEventType) reports across any input event.
-    let secs = unsafe {
-        CGEventSourceSecondsSinceLastEventType(
-            CGEventSourceStateID::HIDSystemState,
-            CGEventType::Null,
-        )
-    };
-    if !secs.is_finite() || secs < 0.0 {
-        return Err(anyhow!("CGEventSource returned non-finite seconds: {secs}"));
-    }
-    Ok(secs as u64)
+    let idle = UserIdle::get_time().map_err(|e| anyhow!("UserIdle::get_time: {e:?}"))?;
+    Ok(idle.as_seconds())
 }
 
-pub fn current_ssid() -> Result<Option<String>> {
-    let Some(iface) = wifi_interface()? else {
-        return Ok(None);
-    };
-    let out = Command::new("/usr/sbin/networksetup")
-        .args(["-getairportnetwork", &iface])
-        .output()
-        .context("running networksetup -getairportnetwork")?;
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    // Expected format: "Current Wi-Fi Network: HomeNet"
-    if let Some(rest) = stdout.split_once("Current Wi-Fi Network:") {
-        let ssid = rest.1.trim();
-        if ssid.is_empty() || ssid.to_lowercase().contains("not associated") {
-            return Ok(None);
-        }
-        return Ok(Some(ssid.to_string()));
-    }
-    // "You are not associated with an AirPort network." style output.
-    Ok(None)
+#[link(name = "IOKit", kind = "framework")]
+extern "C" {
+    fn IOPMCopyAssertionsStatus(out: *mut CFDictionaryRef) -> i32;
 }
 
-/// Find the Wi-Fi device's BSD name (e.g. `en0`, `en1`) by asking
-/// `networksetup -listallhardwareports`. Returns `Ok(None)` when no Wi-Fi
-/// hardware port is present on this Mac.
-fn wifi_interface() -> Result<Option<String>> {
-    let out = Command::new("/usr/sbin/networksetup")
-        .arg("-listallhardwareports")
-        .output()
-        .context("running networksetup -listallhardwareports")?;
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    // The output is paragraphs of:
-    //   Hardware Port: Wi-Fi
-    //   Device: en0
-    //   Ethernet Address: ...
-    let mut lines = stdout.lines();
-    while let Some(line) = lines.next() {
-        if line.trim() == "Hardware Port: Wi-Fi" {
-            if let Some(dev_line) = lines.next() {
-                if let Some(dev) = dev_line.trim().strip_prefix("Device:") {
-                    let dev = dev.trim();
-                    if !dev.is_empty() {
-                        return Ok(Some(dev.to_string()));
-                    }
-                }
+pub fn media_active() -> Result<bool> {
+    let mut raw: CFDictionaryRef = std::ptr::null();
+    let rc = unsafe { IOPMCopyAssertionsStatus(&mut raw) };
+    if rc != 0 {
+        return Err(anyhow!("IOPMCopyAssertionsStatus rc={rc}"));
+    }
+    if raw.is_null() {
+        return Ok(false);
+    }
+    let dict: CFDictionary<CFString, CFNumber> =
+        unsafe { CFDictionary::wrap_under_create_rule(raw) };
+
+    // PreventUserIdleDisplaySleep — held by video playback
+    // PreventUserIdleSystemSleep  — held by audio playback
+    // NoIdleSleepAssertion is intentionally excluded: backups and downloads
+    // hold it too, which would falsely mark a sleeping machine as active.
+    for k in ["PreventUserIdleDisplaySleep", "PreventUserIdleSystemSleep"] {
+        if let Some(n) = dict.find(CFString::from_static_string(k)) {
+            if n.to_i64().unwrap_or(0) > 0 {
+                return Ok(true);
             }
         }
     }
-    Ok(None)
+    Ok(false)
 }
 
 #[cfg(test)]
@@ -85,7 +49,6 @@ mod tests {
     #[test]
     fn idle_seconds_returns_some_value() -> Result<()> {
         let s = idle_seconds()?;
-        // Sanity: on a fresh test run idle should be well under a day.
         if s >= 86_400 {
             return Err(anyhow!("implausible idle: {s}"));
         }
@@ -93,9 +56,8 @@ mod tests {
     }
 
     #[test]
-    fn ssid_does_not_error() -> Result<()> {
-        // May return Some or None depending on host. Either is fine.
-        let _ = current_ssid()?;
+    fn media_active_does_not_error() -> Result<()> {
+        let _ = media_active()?;
         Ok(())
     }
 }

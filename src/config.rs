@@ -7,7 +7,6 @@ pub struct Config {
     pub mqtt: MqttConfig,
     pub update_interval_secs: u64,
     pub idle_threshold_secs: u64,
-    pub wifi_ssids: Vec<String>,
     #[serde(default = "default_topic_prefix")]
     pub topic_prefix: String,
     #[serde(default = "default_discovery_prefix")]
@@ -85,7 +84,6 @@ mod tests {
         let p = write_tmp(r#"
 update_interval_secs = 30
 idle_threshold_secs = 60
-wifi_ssids = ["HomeNet"]
 
 [mqtt]
 host = "192.168.1.10"
@@ -107,9 +105,6 @@ host = "192.168.1.10"
         if cfg.idle_threshold_secs != 60 {
             return Err(anyhow!("idle_threshold_secs: expected 60, got {}", cfg.idle_threshold_secs));
         }
-        if cfg.wifi_ssids != vec!["HomeNet".to_string()] {
-            return Err(anyhow!("wifi_ssids: expected [\"HomeNet\"], got {:?}", cfg.wifi_ssids));
-        }
         if cfg.topic_prefix != "hass-pc-mon" {
             return Err(anyhow!("topic_prefix: expected hass-pc-mon, got {}", cfg.topic_prefix));
         }
@@ -124,7 +119,6 @@ host = "192.168.1.10"
         let p = write_tmp(r#"
 update_interval_secs = 0
 idle_threshold_secs = 0
-wifi_ssids = []
 
 [mqtt]
 host = "x"
@@ -143,7 +137,6 @@ host = "x"
         let p = write_tmp(r#"
 update_interval_secs = 30
 idle_threshold_secs = 60
-wifi_ssids = []
 
 [mqtt]
 host = "x"
@@ -164,24 +157,6 @@ username = "u"
         let err = result.unwrap_err().to_string();
         if !err.contains("reading config file") {
             return Err(anyhow!("expected 'reading config file' in error, got: {err}"));
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn allows_empty_wifi_ssids() -> Result<()> {
-        let p = write_tmp(r#"
-update_interval_secs = 30
-idle_threshold_secs = 60
-wifi_ssids = []
-
-[mqtt]
-host = "x"
-"#)?;
-        let cfg = Config::load(&p)?;
-        let _ = std::fs::remove_file(&p);
-        if !cfg.wifi_ssids.is_empty() {
-            return Err(anyhow!("expected wifi_ssids to be empty, got {:?}", cfg.wifi_ssids));
         }
         Ok(())
     }
