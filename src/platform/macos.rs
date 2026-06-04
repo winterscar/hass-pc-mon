@@ -27,15 +27,17 @@ pub fn media_active() -> Result<bool> {
     let dict: CFDictionary<CFString, CFNumber> =
         unsafe { CFDictionary::wrap_under_create_rule(raw) };
 
-    // PreventUserIdleDisplaySleep — held by video playback
-    // PreventUserIdleSystemSleep  — held by audio playback
-    // NoIdleSleepAssertion is intentionally excluded: backups and downloads
-    // hold it too, which would falsely mark a sleeping machine as active.
-    for k in ["PreventUserIdleDisplaySleep", "PreventUserIdleSystemSleep"] {
-        if let Some(n) = dict.find(CFString::from_static_string(k)) {
-            if n.to_i64().unwrap_or(0) > 0 {
-                return Ok(true);
-            }
+    // PreventUserIdleDisplaySleep is held by anything that needs the screen
+    // awake — video playback, full-screen apps, screen sharing, presentations.
+    //
+    // PreventUserIdleSystemSleep is intentionally NOT checked: bluetoothd holds
+    // it whenever Bluetooth is on, powerd holds it whenever the display is on,
+    // backups/downloads hold it too. Using it would pin activity to ON
+    // permanently on most Macs. The trade-off is that pure audio playback
+    // (Spotify, Music) won't keep the user marked active.
+    if let Some(n) = dict.find(CFString::from_static_string("PreventUserIdleDisplaySleep")) {
+        if n.to_i64().unwrap_or(0) > 0 {
+            return Ok(true);
         }
     }
     Ok(false)
