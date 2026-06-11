@@ -22,7 +22,17 @@ pub fn take(idle_threshold_secs: u64) -> Result<Sample> {
     let monitors = DisplayInfo::all().unwrap_or_default();
     let monitor_names: Vec<String> = monitors
         .iter()
-        .map(|d| if d.name.is_empty() { format!("display-{}", d.id) } else { d.name.clone() })
+        // Prefer friendly_name: on macOS (and Windows) `name` is a synthetic
+        // "Display {id}" while friendly_name carries the actual monitor name.
+        .map(|d| {
+            if !d.friendly_name.is_empty() {
+                d.friendly_name.clone()
+            } else if !d.name.is_empty() {
+                d.name.clone()
+            } else {
+                format!("display-{}", d.id)
+            }
+        })
         .collect();
     Ok(Sample {
         activity,
